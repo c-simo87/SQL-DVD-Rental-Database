@@ -138,9 +138,3 @@ FROM summary
 GROUP BY actor_name
 ORDER BY total_rentals DESC;
 
-
-1.) first create tables
-2.) create function
-3.) create trigger
-4.) enter insert code for detailed
-5.) select * from detailed, select -- summary
