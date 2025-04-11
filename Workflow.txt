@@ -1,0 +1,152 @@
+create a problem from scratch
+-what would help the business = who are the best customers
+-can find this out by query database, create a summary table and join everything
+ex what movie an actor starred in
+
+
+-- time stamp in  WHERE clause
+WHERE startdate >= to_timestamp('12-01-2012 21:24:00', 'dd-mm-yyyy hh24:mi:ss
+
+QUERY 1: FOR DETAILED TABLE
+--COUNT # OF FILMS RENTED BY ACTOR GROUPED BY STORE ID
+SELECT COUNT(film_actor.actor_id) as total_rentals,actor.first_name, actor.last_name, customer.store_id
+FROM film_actor
+INNER JOIN actor ON actor.actor_id = film_actor.actor_id
+INNER JOIN film ON film.film_id = film_actor.film_id
+INNER JOIN inventory ON film.film_id = inventory.film_id
+INNER JOIN rental ON inventory.inventory_id = rental.inventory_id
+INNER JOIN customer ON rental.customer_id = customer.customer_id
+GROUP BY film_actor.actor_id,actor.first_name,actor.last_name,customer.store_id
+ORDER BY actor.last_name DESC
+
+QUERY 2: FOR SUMMARY TABLE
+--COUNT THE NUMBER OF FILMS RENTED WITH EACH ACTOR 
+SELECT COUNT(film_actor.actor_id) as total_rentals,actor.first_name, actor.last_name
+FROM film_actor
+INNER JOIN actor ON actor.actor_id = film_actor.actor_id
+INNER JOIN film ON film.film_id = film_actor.film_id
+INNER JOIN inventory ON film.film_id = inventory.film_id
+INNER JOIN rental ON inventory.inventory_id = rental.inventory_id
+GROUP BY film_actor.actor_id,actor.first_name,actor.last_name
+ORDER BY COUNT(film_actor.actor_id)DESC
+
+
+PART A
+1) OVERALL: Business question should be, which actor produces most sales
+
+PART B: 
+--CREATING THE DETAILED TABLE()
+DROP TABLE IF EXISTS detailed;
+CREATE TABLE detailed(
+	actor_id int,
+	first_name varchar(45),
+	last_name varchar(45),
+	store_id int
+);
+--CREATING THE SUMMARY TABLE (WILL HOLD ONLY TOTAL # OF RENTALS FIRST, LAST NAME)
+DROP TABLE IF EXISTS summary;
+CREATE TABLE summary(
+	total_rentals int,
+	actor_name varchar(90)
+);
+
+PART C:
+--EXTRACTING DATA FROM QUERY 1 AND INSERTING INTO DETAILED TABLE
+INSERT INTO detailed(
+	actor_id,
+	first_name,
+	last_name,
+	store_id
+)
+SELECT COUNT(film_actor.actor_id) as total_rentals,actor.first_name, actor.last_name, customer.store_id
+FROM film_actor
+INNER JOIN actor ON actor.actor_id = film_actor.actor_id
+INNER JOIN film ON film.film_id = film_actor.film_id
+INNER JOIN inventory ON film.film_id = inventory.film_id
+INNER JOIN rental ON inventory.inventory_id = rental.inventory_id
+INNER JOIN customer ON rental.customer_id = customer.customer_id
+GROUP BY film_actor.actor_id,actor.first_name,actor.last_name,customer.store_id
+ORDER BY actor.last_name DESC;
+
+--DO NOT ENTER THIS CODE IN RECORDING, FOR TESTING ONLY
+INSERT INTO summary(
+	total_rentals int,
+	actor_name varchar(90)
+)
+SELECT COUNT(film_actor.actor_id) as total_rentals,actor.first_name, actor.last_name
+FROM film_actor
+INNER JOIN actor ON actor.actor_id = film_actor.actor_id
+INNER JOIN film ON film.film_id = film_actor.film_id
+INNER JOIN inventory ON film.film_id = inventory.film_id
+INNER JOIN rental ON inventory.inventory_id = rental.inventory_id
+GROUP BY film_actor.actor_id,actor.first_name,actor.last_name
+ORDER BY COUNT(film_actor.actor_id)DESC
+
+PART D:
+-TRANSFORMATION FUNCTION
+CREATE OR REPLACE FUNCTION transform_func()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+DELETE FROM summary;
+INSERT INTO summary(
+	SELECT actor_id as total_rentals,
+	concat_ws(',', last_name,first_name) AS actor_name
+	FROM detailed
+	GROUP BY total_rentals,actor_name
+	ORDER BY actor_name DESC
+);
+RETURN NEW;
+END;
+$$;
+
+
+PART E:
+--TRIGGER THAT WILL UPDATE THE SUMMARY TABLE ON ADDED DATA
+CREATE TRIGGER summary_update
+AFTER INSERT ON detailed
+FOR EACH STATEMENT
+EXECUTE PROCEDURE transform_func();
+
+PART F:
+--PROCEDURE TO REFRESH THE DETAILED AND CLEAR SUMMARY
+CREATE OR REPLACE PROCEDURE refresh_all()
+LANGUAGE PLPGSQL
+AS $$
+BEGIN
+DELETE FROM detailed;
+INSERT INTO detailed(
+	actor_id,
+	last_name,
+	first_name,
+	store_id
+)
+SELECT COUNT(film_actor.actor_id) as total_rentals,actor.first_name, actor.last_name, customer.store_id
+FROM film_actor
+INNER JOIN actor ON actor.actor_id = film_actor.actor_id
+INNER JOIN film ON film.film_id = film_actor.film_id
+INNER JOIN inventory ON film.film_id = inventory.film_id
+INNER JOIN rental ON inventory.inventory_id = rental.inventory_id
+INNER JOIN customer ON rental.customer_id = customer.customer_id
+GROUP BY film_actor.actor_id,actor.first_name,actor.last_name,customer.store_id
+ORDER BY actor.last_name DESC;
+END;
+$$;
+
+--TO EXECUTE STORED PROCEDURE:
+CALL refresh_all()
+
+--View each table
+SELECT * FROM detailed;
+SELECT SUM(total_rentals) as total_rentals,actor_name
+FROM summary
+GROUP BY actor_name
+ORDER BY total_rentals DESC;
+
+
+1.) first create tables
+2.) create function
+3.) create trigger
+4.) enter insert code for detailed
+5.) select * from detailed, select -- summary
