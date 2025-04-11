@@ -1,9 +1,3 @@
-create a problem from scratch
--what would help the business = who are the best customers
--can find this out by query database, create a summary table and join everything
-ex what movie an actor starred in
-
-
 -- time stamp in  WHERE clause
 WHERE startdate >= to_timestamp('12-01-2012 21:24:00', 'dd-mm-yyyy hh24:mi:ss
 
